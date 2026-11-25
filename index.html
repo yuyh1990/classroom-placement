@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>교실 배치 돌리기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: 교무실 게시판처럼 밝고 또렷하게, 장난감 같지 않게
+   IDEA: 학교 건물 단면도 — 층마다 교실 문패가 붙은 벽돌 건물 두 동
+   PICTURE: 본관·신관 단면, 교실 문패를 눌러 맞바꾸고 섞기
+   COLOUR and TYPE: 하늘 #dcecf7, 벽돌 #b8553a, 학년별 문패 6색 / Jua + Noto Sans KR
+   LAYOUT: 위 제목+버튼, 가운데 두 건물 나란히(좁으면 세로), 아래 옵션·학급 편집 */
+:root{color-scheme:light dark;--bg:light-dark(#dcecf7,#0f1b2a);--ink:light-dark(#1d2633,#eef2f7);--sub:light-dark(#4d5a6b,#a9b6c6);
+--brick:light-dark(#b8553a,#7d3a28);--brick2:light-dark(#9c4430,#5f2a1c);--roof:light-dark(#5b3a2e,#2b1a14);--card:light-dark(#fff,#1a2738);--line:light-dark(#c9d6e2,#2c3c52);--acc:#ff7a1a}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Noto Sans KR",system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(20px,3vw,40px) max(4vw,14px);max-width:1240px;margin:0 auto}
+h1{font:400 clamp(30px,5vw,44px)/1.05 Jua,sans-serif;margin:0 0 6px;text-wrap:balance}
+.lead{margin:0 0 16px;color:var(--sub)}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:600 16px "Noto Sans KR",sans-serif;min-height:44px;padding:0 16px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+button.go{background:var(--acc);border-color:var(--acc);color:#fff;font-size:18px;padding:0 22px}
+button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button:disabled{opacity:.4;cursor:default}
+.town{display:flex;flex-wrap:wrap;gap:clamp(14px,3vw,36px);align-items:flex-end;margin-top:18px}
+.bld{flex:var(--w,1) 1 calc(var(--w,2)*54px + 90px);max-width:100%}
+.wall{overflow-x:auto}
+.room{white-space:nowrap;overflow:hidden}
+.room small{white-space:nowrap}
+.bctl{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:0 0 8px}
+.bctl button{min-height:34px;padding:0 10px;font-size:14px;border-radius:9px}
+.form{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
+.form input,.form select{font:16px "Noto Sans KR";min-height:44px;padding:0 10px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);flex:1 1 120px}
+.form input[type=number]{flex:0 1 90px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{min-height:36px;font-size:14px;padding:0 10px;background:var(--brick);color:#fff;border:0}
+.box h3{font:600 15px "Noto Sans KR";margin:14px 0 2px}
+.bld{display:flex;flex-direction:column}
+.roof{height:26px;background:var(--roof);clip-path:polygon(4% 100%,96% 100%,88% 0,12% 0);border-radius:4px 4px 0 0}
+.name{font:400 22px Jua,sans-serif;text-align:center;margin:0 0 6px}
+.wall{background:var(--brick);border:6px solid var(--brick2);border-top:0;border-radius:0 0 6px 6px;padding:6px}
+.floor{display:flex;gap:8px;align-items:stretch;padding:8px 6px;border-bottom:4px solid var(--brick2)}
+.floor:last-child{border-bottom:0}
+.lv{flex:none;width:34px;color:#fff;font:400 17px Jua,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.lv small{font:600 11px "Noto Sans KR";opacity:.8}
+.rooms{flex:1;display:grid;gap:6px}
+.room{position:relative;min-height:64px;border-radius:8px;border:0;padding:4px;font:400 22px Jua,sans-serif;color:#1d2633;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 -5px 0 rgba(0,0,0,.14);transition:transform .15s}
+.room.empty{background:rgba(255,255,255,.22);color:#fff;font:600 13px "Noto Sans KR";box-shadow:inset 0 0 0 2px rgba(255,255,255,.45)}
+.room.sel{transform:translateY(-4px);outline:4px solid var(--acc);outline-offset:1px}
+.room.lock::after{content:"고정";position:absolute;top:3px;right:4px;font:800 10px "Noto Sans KR";background:#1d2633;color:#fff;border-radius:4px;padding:0 4px}
+.room.spin{animation:pop .12s}
+@keyframes pop{50%{transform:scale(.93)}}
+.ctl{display:flex;flex-direction:column;gap:4px;flex:none}
+.ctl button{min-height:30px;width:30px;padding:0;border-radius:8px;font-size:16px;background:rgba(255,255,255,.85);color:#1d2633;border:0}
+.ground{height:14px;background:light-dark(#8fb46a,#2f4a2a);border-radius:0 0 10px 10px;margin-top:-2px}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;font-size:14px;color:var(--sub)}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:4px}
+.panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:22px}
+.box{background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:16px}
+.box h2{font:400 20px Jua,sans-serif;margin:0 0 8px}
+label.chk{display:flex;gap:10px;align-items:center;min-height:40px;cursor:pointer}
+label.chk input{width:20px;height:20px;accent-color:var(--acc)}
+.grades{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.box.top{margin-bottom:6px}
+.cmp{display:grid;grid-template-columns:minmax(0,1fr);gap:28px;margin-top:18px}
+@media(min-width:1500px){.cmp{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.sechead{display:flex;align-items:center;gap:10px}
+.sec{font:400 26px/1.1 Jua,sans-serif;margin:0}
+.tag{font:800 12px "Noto Sans KR";background:var(--ink);color:var(--bg);border-radius:6px;padding:2px 8px}
+.now .town{opacity:.92;filter:saturate(.8)}
+.cmp .town{margin-top:10px}
+.room{flex-direction:column;line-height:1.1}
+.room small{font:600 11px "Noto Sans KR";opacity:.75;margin-top:3px}
+.room.chg{box-shadow:inset 0 -5px 0 rgba(0,0,0,.14),0 0 0 3px #fff}
+div.room{cursor:default}
+.room.sp{background:var(--brick);color:#fff;font-size:clamp(12px,3.2vw,16px);white-space:normal;overflow-wrap:anywhere;text-align:center;box-shadow:none}
+.grades label{display:flex;align-items:center;gap:6px;font-size:15px;white-space:nowrap}
+.grades input{width:100%;font:16px "Noto Sans KR";padding:8px;border-radius:8px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink)}
+.hint{font-size:14px;color:var(--sub);margin:8px 0 0}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:12px;font-size:15px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;text-align:center}
+#toast.show{opacity:1}
+@media(max-width:600px){.grades{grid-template-columns:repeat(3,minmax(0,1fr))}.room{min-height:56px;font-size:clamp(13px,4vw,18px);padding:1px}.room small{font-size:9px}.lv{width:28px;font-size:15px}.band{padding-inline:10px}.wall{padding:4px}.rooms{gap:4px}.floor{gap:6px;padding:8px 4px}}
+@media(prefers-reduced-motion:reduce){.room,.room.spin{transition:none;animation:none}}
+
+.steps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 14px}
+.steps button{min-height:56px;font-size:15px;white-space:nowrap;padding:0 12px;text-align:left;display:flex;align-items:center;gap:10px;border-radius:14px}
+.steps b{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--line);color:var(--ink);font:400 17px Jua}
+.steps button.on{background:var(--ink);color:var(--bg)}.steps button.on b{background:var(--acc);color:#fff}
+.next{display:flex;justify-content:flex-end;margin-top:18px}
+[hidden]{display:none!important}
+</style></head><body>
+<div class="band">
+  <h1>교실 배치 돌리기</h1>
+  <p class="lead">먼저 학교 구조와 올해 배치를 맞추고, 그다음 2027학년도 배치를 만들어 비교해요.</p>
+  <div class="steps">
+    <button id="tab1"><b>1</b>학교 구조·현재</button>
+    <button id="tab2"><b>2</b>2027학년도 비교</button>
+  </div>
+  <div class="box top">
+    <h2 id="gTitle">학년별 학급 수</h2>
+    <div class="grades" id="grades"></div>
+    <div class="bar" style="margin-top:12px"><button id="apply">학급 수 적용</button><span class="hint" style="margin:0">층 옆 ＋ / − 로 교실 칸을 늘리거나 줄일 수 있어요(빈 교실만 줄어듭니다).</span></div>
+  </div>
+
+  <section id="s1">
+    <div class="sechead" style="margin-top:18px"><h2 class="sec">2026학년도 (현재) 편집</h2></div>
+    <p class="hint" id="info1"></p>
+    <div class="bar" style="margin-top:8px"><button id="undo1">되돌리기</button></div>
+    <div class="town" id="townEdit"></div>
+    <div class="panel">
+      <div class="box">
+        <h2>건물 추가</h2>
+        <p class="hint" style="margin:0">건물 이름 아래 버튼으로 층을 더하거나 빼고, 학급이 없는 건물은 지울 수 있어요.</p>
+        <div class="form"><input id="bName" placeholder="건물 이름 (예: 별관)" maxlength="10"><input id="bFloors" type="number" min="1" max="10" value="3" aria-label="층 수"><button id="addBld">추가</button></div>
+      </div>
+      <div class="box">
+        <h2>특별실</h2>
+        <p class="hint" style="margin:0">특별실은 섞이지 않고 늘 그 자리에 있어요. ×를 누르면 지워져요.</p>
+        <div class="form"><select id="spFloor" aria-label="층 선택"></select><input id="spName" placeholder="이름 (예: 과학실)" maxlength="8"><button id="addSp">추가</button></div>
+        <div class="chips" id="spList"></div>
+      </div>
+    </div>
+    <div class="next"><button class="go" id="toStep2">다 됐어요, 2027학년도 비교하기 →</button></div>
+  </section>
+
+  <section id="s2">
+    <div class="cmp">
+      <section class="now">
+        <div class="sechead"><h2 class="sec">2026학년도 (현재)</h2><span class="tag">고정</span></div>
+        <p class="hint" id="nowInfo"></p>
+        <div class="town" id="townNow"></div>
+      </section>
+      <section>
+        <div class="sechead"><h2 class="sec">2027학년도 (변경안)</h2></div>
+        <p class="hint" id="diff"></p>
+        <div class="bar">
+          <button class="go" id="shuffle">교실 섞기</button>
+          <button id="lockMode">고정 모드</button>
+          <button id="undo">되돌리기</button>
+          <button id="copy">결과 복사</button>
+          <button id="reset">현재 배치로</button>
+        </div>
+        <div class="town" id="town"></div>
+      </section>
+    </div>
+    <div class="panel">
+      <div class="box">
+        <h2>섞기 규칙</h2>
+        <label class="chk"><input type="checkbox" id="optFloor" checked> 같은 학년은 같은 층에</label>
+        <label class="chk"><input type="checkbox" id="optNext" checked> 같은 학년은 붙어 있는 교실로</label>
+        <label class="chk"><input type="checkbox" id="optLow"> 저학년일수록 낮은 층 먼저</label>
+        <p class="hint">조건을 다 지킬 수 없으면 가능한 만큼만 지키고 알려 드려요.</p>
+      </div>
+    </div>
+  </section>
+  <div class="legend" id="legend"></div>
+</div>
+<div id="toast"></div>
+<script>
+{
+const COLORS=['#ffb4a2','#ffd166','#a7e8a1','#9ad1f5','#c9b6f2','#f7a8cf'];
+const INIT=[
+ {b:'본관',lv:3,rooms:['2-1','2-2','4-1','4-2',null,'컴퓨터실']},
+ {b:'본관',lv:2,rooms:['1-1','1-2','3-1','3-2','3-3','도서관']},
+ {b:'본관',lv:1,rooms:[]},
+ {b:'신관',lv:3,rooms:['6-1','6-2']},
+ {b:'신관',lv:2,rooms:['5-1','5-2']},
+ {b:'신관',lv:1,rooms:[]}
+];
+const KEY='classroom-shuffle-v6';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clone=o=>JSON.parse(JSON.stringify(o));
+const isCls=c=>/^\d+-\d+$/.test(String(c));
+const isSp=c=>!!c&&!isCls(c);
+const fx=(f,ri)=>f.locks[ri]||isSp(f.rooms[ri]);
+const grade=c=>parseInt(String(c).split('-')[0])||0;
+const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const norm=fl=>fl.map(f=>({b:f.b,lv:f.lv,rooms:[...f.rooms],locks:f.rooms.map((_,i)=>!!(f.locks&&f.locks[i]))}));
+const copyCur=()=>norm(D.cur).map(f=>({...f,locks:f.rooms.map(()=>false)}));
+const sig=fl=>JSON.stringify(fl.map(f=>[f.b,f.lv,f.rooms.length,f.rooms.map(c=>isSp(c)?c:0)]));
+const bldsOf=fl=>[...new Set(fl.map(f=>f.b))];
+let D=null,hist=[],sel=null,lockMode=false,busy=false;
+try{D=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!D||!Array.isArray(D.cur)){D={step:1,cur:norm(INIT),next:null,sig:''}}
+const T=()=>D.step===1?D.cur:D.next;
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){}};
+const push=()=>{hist.push(clone({cur:D.cur,next:D.next,sig:D.sig}));if(hist.length>50)hist.shift()};
+const nowAt=(f,ri)=>{const n=D.cur.find(x=>x.b===f.b&&x.lv===f.lv);return n?n.rooms[ri]:undefined};
+let tt;const toast=m=>{const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),2600)};
+
+function town(st,o){
+  const edit=o.edit;
+  return bldsOf(st).map((b,bi)=>{const cols=Math.max(1,...st.filter(f=>f.b===b).map(f=>f.rooms.length));return `<div class="bld" style="--w:${Math.max(2,cols)}"><p class="name">${esc(b)}</p>${o.struct?`<div class="bctl"><button data-fup="${bi}">층 ＋</button><button data-fdn="${bi}">층 −</button><button data-bdel="${bi}">건물 삭제</button></div>`:''}<div class="roof"></div><div class="wall">`+
+    st.map((f,fi)=>({f,fi})).filter(x=>x.f.b===b).sort((x,y)=>y.f.lv-x.f.lv).map(({f,fi})=>{const n=f.rooms.filter(isCls).length;return `<div class="floor"><div class="lv">${f.lv}층<small>${n?n+'학급':''}</small></div><div class="rooms" style="grid-template-columns:repeat(${cols},minmax(38px,1fr))">`+
+      (f.rooms.length?f.rooms.map((c,ri)=>{
+        const sp=isSp(c),lock=!sp&&edit&&f.locks[ri],isSel=edit&&sel&&sel[0]===fi&&sel[1]===ri;
+        const cur=nowAt(f,ri),chg=o.cmp&&(cur??null)!==(c??null);
+        const tag=edit?'button':'div';
+        const sub=chg?`<small>${cur===undefined?'새 칸':'현재 '+(cur?esc(cur):'빈 교실')}</small>`:'';
+        return `<${tag} class="room${c?'':' empty'}${sp?' sp':''}${lock?' lock':''}${isSel?' sel':''}${chg?' chg':''}${o.spin?' spin':''}" ${edit?`data-f="${fi}" data-r="${ri}"`:''} style="${c&&!sp?'background:'+COLORS[(grade(c)-1+6)%6]:''}" aria-label="${f.lv}층 ${c?esc(c):'빈 교실'}">${c?esc(c):'빈 교실'}${sub}</${tag}>`}).join(''):'<span style="grid-column:1/-1;color:#fff;opacity:.8;font-size:14px;min-height:48px;display:flex;align-items:center">교실 없음'+(edit?' · ＋로 추가':'')+'</span>')+
+      `</div>${edit?`<div class="ctl"><button data-add="${fi}" aria-label="교실 추가">＋</button><button data-del="${fi}" aria-label="교실 줄이기">−</button></div>`:''}</div>`}).join('')+
+    `</div><div class="ground"></div></div>`}).join('');
+}
+const count=fl=>fl.flatMap(f=>f.rooms).filter(isCls).length;
+function render(spin){
+  const s1=D.step===1;
+  $('s1').hidden=!s1;$('s2').hidden=s1;
+  $('tab1').classList.toggle('on',s1);$('tab2').classList.toggle('on',!s1);
+  $('gTitle').textContent=s1?'2026학년도 (현재) 학년별 학급 수':'2027학년도 학년별 학급 수';
+  $('legend').innerHTML=COLORS.map((c,i)=>`<span><i style="background:${c}"></i>${i+1}학년</span>`).join('');
+  $('undo').disabled=$('undo1').disabled=!hist.length;
+  if(s1){
+    $('townEdit').innerHTML=town(D.cur,{edit:true,struct:true});
+    $('info1').textContent=`총 ${count(D.cur)}학급 · 학급을 누르고 다른 교실을 누르면 자리가 바뀌어요. 올해 실제 배치와 똑같이 맞춰 주세요.`;
+    const bo=bldsOf(D.cur),fl=D.cur.map((f,fi)=>({f,fi})).sort((x,y)=>bo.indexOf(x.f.b)-bo.indexOf(y.f.b)||y.f.lv-x.f.lv);
+    const keep=$('spFloor').value;
+    $('spFloor').innerHTML=fl.map(({f,fi})=>`<option value="${fi}">${esc(f.b)} ${f.lv}층</option>`).join('');
+    if(keep&&D.cur[+keep])$('spFloor').value=keep;
+    const sps=[];D.cur.forEach((f,fi)=>f.rooms.forEach((c,ri)=>{if(isSp(c))sps.push({fi,ri,t:`${f.b} ${f.lv}층 ${c}`})}));
+    $('spList').innerHTML=sps.length?sps.map(x=>`<button data-spdel="${x.fi}-${x.ri}" aria-label="${esc(x.t)} 지우기">${esc(x.t)} ×</button>`).join(''):'<span class="hint" style="margin:0">특별실이 없어요.</span>';
+  }else{
+    $('townNow').innerHTML=town(D.cur,{});
+    $('town').innerHTML=town(D.next,{edit:true,cmp:true,spin});
+    const nN=count(D.cur),nS=count(D.next);
+    let moved=0;D.next.forEach(f=>f.rooms.forEach((c,ri)=>{if((nowAt(f,ri)??null)!==(c??null))moved++}));
+    $('nowInfo').textContent=`총 ${nN}학급 · 비교 기준이라 바뀌지 않아요. 고치려면 1단계로 가세요.`;
+    $('diff').textContent=`총 ${nS}학급${nS!==nN?` (현재보다 ${nS>nN?'+':''}${nS-nN})`:''} · ${moved?`바뀐 교실 ${moved}칸 (흰 테두리, 아래 작은 글씨는 현재 학급)`:'현재와 같아요'}`;
+    $('lockMode').classList.toggle('on',lockMode);
+    $('lockMode').textContent=lockMode?'고정 모드 켜짐':'고정 모드';
+  }
+}
+function renderGrades(){
+  const cnt=[0,0,0,0,0,0];T().forEach(f=>f.rooms.forEach(c=>{const g=grade(c);if(isCls(c)&&g>=1&&g<=6)cnt[g-1]++}));
+  $('grades').innerHTML=cnt.map((n,i)=>`<label>${i+1}학년<input type="number" min="0" max="15" inputmode="numeric" id="g${i}" value="${n}"></label>`).join('');
+}
+function go(step){
+  if(busy)return;sel=null;lockMode=false;
+  if(step===2){
+    const sg=sig(D.cur);
+    if(!D.next||D.sig!==sg){const had=!!D.next;D.next=copyCur();D.sig=sg;if(had)toast('학교 구조가 바뀌어서 변경안을 현재 배치로 새로 시작했어요.')}
+  }
+  D.step=step;save();render();renderGrades();scrollTo({top:0,behavior:'smooth'});
+}
+
+function plan(){
+  const opt={floor:$('optFloor').checked,next:$('optNext').checked,low:$('optLow').checked};
+  const N=clone(D.next),cls=[],cap=N.map(()=>0);
+  N.forEach((f,fi)=>f.rooms.forEach((c,ri)=>{if(!fx(f,ri)){cap[fi]++;if(c)cls.push(c);f.rooms[ri]=null}}));
+  const total=cap.reduce((a,b)=>a+b,0);
+  const fill=(fi,list)=>{let k=0;N[fi].rooms.forEach((c,ri)=>{if(!fx(N[fi],ri))N[fi].rooms[ri]=list[k++]??null})};
+  let warn='';
+  if(opt.floor){
+    const by={};cls.forEach(c=>(by[grade(c)]??=[]).push(c));
+    let groups=Object.keys(by).map(g=>({g:+g,list:by[g].sort()}));
+    groups=opt.low?groups.sort((a,b)=>a.g-b.g):shuf(groups).sort((a,b)=>b.list.length-a.list.length);
+    let best=null;
+    for(let t=0;t<200&&!best;t++){
+      const left=[...cap],asg=N.map(()=>[]);let ok=true;
+      const gs=opt.low?groups:(t?shuf([...groups]):groups);
+      for(const gr of gs){
+        let cand=N.map((f,i)=>i).filter(i=>left[i]>=gr.list.length);
+        cand=opt.low?cand.sort((a,b)=>N[a].lv-N[b].lv||a-b):shuf(cand);
+        if(!cand.length){ok=false;break}
+        left[cand[0]]-=gr.list.length;asg[cand[0]].push(gr);
+      }
+      if(ok)best=asg;
+    }
+    if(best){
+      best.forEach((gs,fi)=>{
+        const empties=cap[fi]-gs.reduce((a,g)=>a+g.list.length,0);
+        let units=opt.next?gs.map(g=>shuf([...g.list])):gs.flatMap(g=>g.list.map(c=>[c]));
+        units=units.concat(Array.from({length:empties},()=>[null]));
+        if(opt.next&&opt.low)units.sort((a,b)=>(grade(a[0])||99)-(grade(b[0])||99));else shuf(units);
+        fill(fi,units.flat());
+      });
+      return {N,warn};
+    }
+    warn='한 학년을 한 층에 다 모을 수 없어 자유롭게 섞었어요.';
+  }
+  const pool=shuf(cls.concat(Array.from({length:total-cls.length},()=>null)));
+  let k=0;N.forEach(f=>f.rooms.forEach((c,ri)=>{if(!fx(f,ri))f.rooms[ri]=pool[k++]}));
+  return {N,warn};
+}
+function doShuffle(){
+  if(busy)return;sel=null;
+  const {N,warn}=plan();push();
+  const finish=()=>{D.next=N;busy=false;save();render(true);toast(warn||'새 배치가 나왔어요!')};
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return finish();
+  busy=true;let n=0;
+  const tick=setInterval(()=>{
+    const all=[];D.next.forEach(f=>f.rooms.forEach((c,ri)=>{if(!fx(f,ri))all.push(c)}));shuf(all);
+    let k=0;D.next.forEach(f=>f.rooms.forEach((c,ri)=>{if(!fx(f,ri))f.rooms[ri]=all[k++]}));
+    render(true);
+    if(++n>11){clearInterval(tick);finish()}
+  },80);
+}
+
+function onTown(e){
+  if(busy)return;
+  const st=T();
+  const add=e.target.closest('[data-add]'),del=e.target.closest('[data-del]'),r=e.target.closest('.room');
+  const fup=e.target.closest('[data-fup]'),fdn=e.target.closest('[data-fdn]'),bdel=e.target.closest('[data-bdel]');
+  if(fup||fdn||bdel){
+    const b=bldsOf(st)[+(fup||fdn||bdel).dataset[fup?'fup':fdn?'fdn':'bdel']];
+    const mine=st.filter(f=>f.b===b);
+    if(fup){push();st.push({b,lv:Math.max(...mine.map(f=>f.lv))+1,rooms:[],locks:[]});save();render();toast(`${b}에 층을 추가했어요.`);return}
+    if(fdn){const top=mine.reduce((a,f)=>f.lv>a.lv?f:a);
+      if(mine.length<2){toast('마지막 층은 지울 수 없어요. 건물 삭제를 쓰세요.');return}
+      if(top.rooms.some(isCls)){toast(`${top.lv}층에 학급이 있어 지울 수 없어요.`);return}
+      push();st.splice(st.indexOf(top),1);sel=null;save();render();toast(`${b} ${top.lv}층을 지웠어요.`);return}
+    if(mine.some(f=>f.rooms.some(isCls))){toast(`${b}에 학급이 있어 지울 수 없어요. 학급을 먼저 옮겨 주세요.`);return}
+    if(bldsOf(st).length<2){toast('건물이 하나뿐이라 지울 수 없어요.');return}
+    push();D.cur=st.filter(f=>f.b!==b);sel=null;save();render();toast(`${b}을(를) 지웠어요. 되돌리기로 복구할 수 있어요.`);return}
+  if(add){push();const f=st[+add.dataset.add];f.rooms.push(null);f.locks.push(false);save();render();return}
+  if(del){const f=st[+del.dataset.del];const i=f.rooms.lastIndexOf(null);
+    if(i<0){toast('빈 교실이 없어서 줄일 수 없어요.');return}
+    push();f.rooms.splice(i,1);f.locks.splice(i,1);sel=null;save();render();return}
+  if(!r)return;
+  const fi=+r.dataset.f,ri=+r.dataset.r;
+  if(isSp(st[fi].rooms[ri])){toast(st[fi].rooms[ri]+'은(는) 늘 고정이에요.');return}
+  if(lockMode&&D.step===2){push();st[fi].locks[ri]=!st[fi].locks[ri];save();render();return}
+  if(!sel){if(!st[fi].rooms[ri]){toast('먼저 옮길 학급을 눌러 주세요.');return}sel=[fi,ri];render();return}
+  if(sel[0]===fi&&sel[1]===ri){sel=null;render();return}
+  push();const a=st[sel[0]],b=st[fi];
+  [a.rooms[sel[1]],b.rooms[ri]]=[b.rooms[ri],a.rooms[sel[1]]];
+  sel=null;save();render();
+}
+$('townEdit').addEventListener('click',onTown);
+$('town').addEventListener('click',onTown);
+$('tab1').onclick=()=>go(1);
+$('tab2').onclick=()=>go(2);
+$('toStep2').onclick=()=>go(2);
+$('shuffle').onclick=doShuffle;
+$('addBld').onclick=()=>{
+  const name=$('bName').value.trim(),n=Math.max(1,Math.min(10,parseInt($('bFloors').value)||1));
+  if(!name){toast('건물 이름을 적어 주세요.');return}
+  if(bldsOf(D.cur).includes(name)){toast('같은 이름의 건물이 있어요.');return}
+  push();for(let lv=n;lv>=1;lv--)D.cur.push({b:name,lv,rooms:[],locks:[]});
+  $('bName').value='';save();render();toast(`${name} ${n}층 건물을 추가했어요. 층 옆 ＋로 교실을 만드세요.`)};
+$('addSp').onclick=()=>{
+  const name=$('spName').value.trim(),f=D.cur[+$('spFloor').value];
+  if(!name||!f){toast('층과 특별실 이름을 정해 주세요.');return}
+  if(isCls(name)){toast('학급 이름(예: 3-1) 모양은 특별실로 쓸 수 없어요.');return}
+  push();f.rooms.push(name);f.locks.push(false);$('spName').value='';save();render();toast(`${f.b} ${f.lv}층에 ${name}을(를) 넣었어요.`)};
+$('spList').addEventListener('click',e=>{const t=e.target.closest('[data-spdel]');if(!t||busy)return;
+  const [fi,ri]=t.dataset.spdel.split('-').map(Number);push();D.cur[fi].rooms.splice(ri,1);D.cur[fi].locks.splice(ri,1);sel=null;save();render()});
+$('lockMode').onclick=()=>{lockMode=!lockMode;sel=null;render();toast(lockMode?'고정할 교실을 누르세요. 다시 누르면 풀려요.':'고정 모드를 껐어요.')};
+const undo=()=>{if(!hist.length||busy)return;Object.assign(D,hist.pop());if(D.step===2&&!D.next)D.step=1;sel=null;save();render();renderGrades()};
+$('undo').onclick=undo;$('undo1').onclick=undo;
+$('reset').onclick=()=>{if(busy)return;push();D.next=copyCur();sel=null;save();render();renderGrades();toast('현재 배치로 돌아왔어요. 되돌리기도 가능해요.')};
+$('copy').onclick=async()=>{
+  const bo=bldsOf(D.next);
+  const txt='2027학년도 교실 배치\n'+[...D.next].sort((x,y)=>bo.indexOf(x.b)-bo.indexOf(y.b)||y.lv-x.lv).map(f=>`${f.b} ${f.lv}층: ${f.rooms.length?f.rooms.map(c=>c||'빈교실').join(' '):'-'}`).join('\n');
+  try{await navigator.clipboard.writeText(txt);toast('배치 결과를 복사했어요.')}catch(e){toast('복사가 막혀 있어요. 화면을 캡처해 주세요.')}
+};
+$('apply').onclick=()=>{
+  const st=T();
+  const want=[...Array(6)].map((_,i)=>Math.max(0,Math.min(15,parseInt($('g'+i).value)||0)));
+  const list=want.flatMap((n,i)=>Array.from({length:n},(_,k)=>`${i+1}-${k+1}`));
+  push();
+  const keep=new Set(list);
+  st.forEach(f=>f.rooms.forEach((c,ri)=>{if(isCls(c)&&!keep.has(c)){f.rooms[ri]=null;f.locks[ri]=false}}));
+  const placed=new Set(st.flatMap(f=>f.rooms).filter(Boolean));
+  let added=0,where='';
+  for(const c of list.filter(c=>!placed.has(c))){
+    let spot=null;st.some((f,fi)=>{const ri=f.rooms.indexOf(null);if(ri>=0){spot=[fi,ri];return true}});
+    if(!spot){const f=st.filter(x=>x.b===st[0].b).reduce((a,x)=>x.lv<a.lv?x:a);f.rooms.push(null);f.locks.push(false);spot=[st.indexOf(f),f.rooms.length-1];added++;where=`${f.b} ${f.lv}층`}
+    st[spot[0]].rooms[spot[1]]=c;
+  }
+  sel=null;save();render();renderGrades();
+  toast(`총 ${list.length}학급으로 맞췄어요.`+(added?` 교실이 모자라 ${where}에 ${added}칸 추가했어요.`:''));
+};
+if(D.step===2&&!D.next)D.step=1;
+render();renderGrades();
+}
+</script>
+</body></html>
